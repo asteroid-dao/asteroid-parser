@@ -5,7 +5,6 @@ import rehypeStringify from 'rehype-stringify'
 import remarkStringify from 'remark-stringify'
 import rehypeRemark from 'rehype-remark'
 import rehypeParse from 'rehype-parse'
-import { mdastToSlate, slateToMdast } from 'remark-slate-transformer'
 import slate, { serialize } from 'remark-slate'
 import { visit } from 'unist-util-visit'
 import raw from 'rehype-raw'
@@ -25,7 +24,8 @@ import {
   split,
   filter,
   pathEq,
-  replace
+  replace,
+  either
 } from 'ramda'
 
 export const m2mt = unified().use(remarkParse).parse
@@ -104,7 +104,10 @@ export const h2s = ifElse(
 )
 
 export const s2m = ifElse(
-  both(propEq('length', 1), pathEq([0, 'children', 0, 'text'], '')),
+  both(
+    propEq('length', 1),
+    either(pathEq([0, 'children', 0, 'text'], ''), pathEq([0, 'text'], ''))
+  ),
   always(''),
   compose(
     join(''),

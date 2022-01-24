@@ -1,6 +1,6 @@
 {
   "name": "asteroid-parser",
-  "version": "0.0.2",
+  "version": "0.0.5",
   "author": "ocrybit",
   "license": "MIT",
   "repository": "asteroid-dao/asteroid-parser",
@@ -59,7 +59,7 @@
     "rehype-stringify": "^9.0.2",
     "remark-parse": "^10.0.1",
     "remark-rehype": "^10.1.0",
-    "remark-slate-transformer": "^0.6.6",
+    "remark-slate": "^1.8.2",
     "remark-stringify": "^10.0.2",
     "unified": "^10.1.1",
     "unified-stream": "^2.0.0",
