@@ -1,6 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, createRef } from 'react'
 import ReactQuill from 'react-quill'
-
 import 'react-quill/dist/quill.snow.css'
 import { createEditor } from 'slate'
 import { useFocused, Slate, Editable, withReact } from 'slate-react'
@@ -39,21 +38,12 @@ function lineBreakMatcher() {
   return newDelta
 }
 ReactQuill.Quill.register(SmartBreak)
-
-Break.prototype.insertInto = function (parent, ref) {
-  Embed.prototype.insertInto.call(this, parent, ref)
-}
-Break.prototype.length = function () {
-  return 1
-}
-Break.prototype.value = function () {
-  return '\n'
-}
 const App = () => {
   const [editor] = useState(() => withReact(createEditor()))
   const [qvalue, setQValue] = useState('')
   const [upV, setUpV] = useState(null)
   const [isMarkdown, setIsMarkdown] = useState(true)
+  let quillRef = React.createRef()
   const [value, setValue] = useState([
     {
       type: 'paragraph',
@@ -85,6 +75,29 @@ const App = () => {
     },
     keyboard: {
       bindings: {
+        handleDelete(range, context) {
+          // Check for astral symbols
+          const length = /^[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(context.suffix)
+            ? 2
+            : 1
+          if (range.index >= this.quill.getLength() - length) return
+          let formats = {}
+          const [line] = this.quill.getLine(range.index)
+          let delta = new Delta().retain(range.index).delete(length)
+          if (context.offset >= line.length() - 1) {
+            const [next] = this.quill.getLine(range.index + 1)
+            if (next) {
+              const curFormats = line.formats()
+              const nextFormats = this.quill.getFormat(range.index, 1)
+              formats = AttributeMap.diff(curFormats, nextFormats) || {}
+              if (Object.keys(formats).length > 0) {
+                delta = delta.retain(next.length() - 1).retain(1, formats)
+              }
+            }
+          }
+          this.quill.updateContents(delta, ReactQuill.Quill.sources.USER)
+          this.quill.focus()
+        },
         handleEnter: {
           key: 13,
           handler: function (range, context) {
@@ -271,9 +284,20 @@ const App = () => {
         <Flex bg='#ddd' flex={1} direction='column'>
           <Box flex={1} bg='white' sx={{ overflow: 'auto' }}>
             <ReactQuill
+              ref={el => {
+                if (!isNil(el)) quillRef = el.getEditor()
+              }}
               theme='snow'
               value={qvalue}
-              onChange={setQValue}
+              onChange={(val, d, s, e) => {
+                const length = e.getLength()
+                const text = e.getText(length - 2, 2)
+                // Remove extraneous new lines
+                if (text === '\n\n') {
+                  quillRef.deleteText(length - 1, 1)
+                }
+                setQValue(val)
+              }}
               modules={modules}
               onFocus={() => setIsMarkdown(false)}
               onBlur={() => setIsMarkdown(true)}
