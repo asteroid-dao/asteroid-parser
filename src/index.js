@@ -10,6 +10,8 @@ import { visit } from 'unist-util-visit'
 import raw from 'rehype-raw'
 const entities = require('entities')
 import {
+  when,
+  equals,
   ifElse,
   always,
   join,
@@ -48,9 +50,9 @@ export const mt2m = unified().use(remarkStringify).stringify
 
 export const mt2s = mt => o(m2s, mt2m)(mt)
 
-export const m2ht = m => o(mt2ht, m2mt)(m)
+export const m2ht = o(mt2ht, m2mt)
 
-export const h2mt = h => o(ht2mt, h2ht)(h)
+export const h2mt = o(ht2mt, h2ht)
 
 export const mt2h = mt => {
   const ht = mt2ht(mt)
@@ -63,16 +65,16 @@ export const mt2h = mt => {
   return ht2h(ht)
 }
 
-export const ht2s = ht => o(mt2s, ht2mt)(ht)
+export const ht2s = o(mt2s, ht2mt)
 
-export const m2h = m => o(ht2h, m2ht)(m)
+export const m2h = o(ht2h, m2ht)
 
 export const m2s = m => {
   let isBlank = false
   return compose(
     map(v => ({
       type: 'paragraph',
-      children: [{ text: v === '\\' ? '<br />' : v }]
+      children: [{ text: v === '\\' ? '<br />' : v.replace(/\\$/, '  ') }]
     })),
     filter(v => {
       if (isBlank) {
@@ -90,7 +92,7 @@ export const m2s = m => {
   )(m)
 }
 
-export const h2m = h => o(mt2m, h2mt)(h)
+export const h2m = o(mt2m, h2mt)
 
 export const h2s = ifElse(
   isEmpty,
@@ -115,8 +117,28 @@ export const s2m = ifElse(
   )
 )
 
-export const s2mt = s => o(m2mt, s2m)(s)
+export const s2mt = o(m2mt, s2m)
 
-export const s2h = s => o(mt2h, s2mt)(s)
+export const s2h = o(mt2h, s2mt)
 
-export const s2ht = s => o(m2ht, s2m)(s)
+export const s2ht = o(m2ht, s2m)
+
+export const h2q = replace(/\<br\>\n/g, '<br>')
+
+export const s2q = o(h2q, s2h)
+
+export const q2h = when(equals('<p><br></p>'), always(''))
+
+export const q2s = o(h2s, q2h)
+
+export const mt2q = o(h2q, mt2ht)
+
+export const q2mt = o(h2mt, q2h)
+
+export const m2q = o(h2q, m2h)
+
+export const q2m = o(h2m, q2h)
+
+export const ht2q = o(h2q, ht2h)
+
+export const q2ht = o(h2ht, q2h)

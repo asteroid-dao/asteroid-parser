@@ -1,28 +1,54 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import ReactQuill from 'react-quill'
+
 import 'react-quill/dist/quill.snow.css'
 import { createEditor } from 'slate'
 import { useFocused, Slate, Editable, withReact } from 'slate-react'
 import { ChakraProvider, Flex, Box } from '@chakra-ui/react'
 import { isNil } from 'ramda'
-import {
-  s2ht,
-  s2mt,
-  s2m,
-  h2m,
-  m2h,
-  m2mt,
-  mt2ht,
-  h2s,
-  h2ht,
-  ht2mt,
-  ht2h,
-  mt2m,
-  s2h
-} from 'asteroid-editor'
+import { s2m, s2h, q2s, s2q } from 'asteroid-editor'
 import 'asteroid-editor/dist/index.css'
 const entities = require('entities')
 
+let Parchment = ReactQuill.Quill.import('parchment')
+let Delta = ReactQuill.Quill.import('delta')
+let Break = ReactQuill.Quill.import('blots/break')
+let Embed = ReactQuill.Quill.import('blots/embed')
+let Block = ReactQuill.Quill.import('blots/block')
+
+class SmartBreak extends Break {
+  length() {
+    return 1
+  }
+
+  value() {
+    return '\n'
+  }
+
+  insertInto(parent, ref) {
+    Embed.prototype.insertInto.call(this, parent, ref)
+  }
+}
+
+SmartBreak.blotName = 'break'
+SmartBreak.tagName = 'BR'
+
+function lineBreakMatcher() {
+  let newDelta = new Delta()
+  newDelta.insert({ break: '' })
+  return newDelta
+}
+ReactQuill.Quill.register(SmartBreak)
+
+Break.prototype.insertInto = function (parent, ref) {
+  Embed.prototype.insertInto.call(this, parent, ref)
+}
+Break.prototype.length = function () {
+  return 1
+}
+Break.prototype.value = function () {
+  return '\n'
+}
 const App = () => {
   const [editor] = useState(() => withReact(createEditor()))
   const [qvalue, setQValue] = useState('')
@@ -34,18 +60,107 @@ const App = () => {
       children: [{ text: '' }]
     }
   ])
-
   useEffect(() => {
-    if (isMarkdown) setQValue(s2h(value))
+    if (isMarkdown) {
+      setQValue(s2q(value))
+    }
     setUpV(false)
   }, [value])
 
   useEffect(() => {
     if (!isMarkdown) {
       setUpV(true)
-      setValue(h2s(qvalue === '<p><br></p>' ? '' : qvalue))
+      setValue(q2s(qvalue))
     }
   }, [qvalue])
+  const options = {
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'blockquote', 'link'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['clean']
+    ],
+    clipboard: {
+      matchers: [['BR', lineBreakMatcher]]
+    },
+    keyboard: {
+      bindings: {
+        handleEnter: {
+          key: 13,
+          handler: function (range, context) {
+            if (range.length > 0) {
+              this.quill.scroll.deleteAt(range.index, range.length)
+            }
+            let lineFormats = Object.keys(context.format).reduce(function (
+              lineFormats,
+              format
+            ) {
+              if (
+                Parchment.query(format, Parchment.Scope.BLOCK) &&
+                !Array.isArray(context.format[format])
+              ) {
+                lineFormats[format] = context.format[format]
+              }
+              return lineFormats
+            },
+            {})
+            var previousChar = this.quill.getText(range.index - 1, 1)
+            this.quill.insertText(
+              range.index,
+              '\n',
+              lineFormats,
+              ReactQuill.Quill.sources.USER
+            )
+            if (previousChar == '' || previousChar == '\n') {
+              this.quill.setSelection(
+                range.index + 2,
+                ReactQuill.Quill.sources.SILENT
+              )
+            } else {
+              this.quill.setSelection(
+                range.index + 1,
+                ReactQuill.Quill.sources.SILENT
+              )
+            }
+            try {
+              this.quill.selection.scrollIntoView()
+            } catch (e) {}
+            Object.keys(context.format).forEach(name => {
+              if (lineFormats[name] != null) return
+              if (Array.isArray(context.format[name])) return
+              if (name === 'link') return
+              this.quill.format(
+                name,
+                context.format[name],
+                ReactQuill.Quill.sources.USER
+              )
+            })
+          }
+        },
+        linebreak: {
+          key: 13,
+          shiftKey: true,
+          handler: function (range, context) {
+            var nextChar = this.quill.getText(range.index + 1, 1)
+            var ee = this.quill.insertEmbed(range.index, 'break', true, 'user')
+            if (nextChar.length == 0) {
+              var ee = this.quill.insertEmbed(
+                range.index,
+                'break',
+                true,
+                'user'
+              )
+            }
+            this.quill.setSelection(
+              range.index + 1,
+              ReactQuill.Quill.sources.SILENT
+            )
+          }
+        }
+      }
+    }
+  }
+  const modules = useMemo(() => options, [])
   return (
     <ChakraProvider>
       <Flex height='100vh'>
@@ -158,18 +273,11 @@ const App = () => {
             <ReactQuill
               theme='snow'
               value={qvalue}
+              onChange={setQValue}
+              modules={modules}
               onFocus={() => setIsMarkdown(false)}
               onBlur={() => setIsMarkdown(true)}
-              onChange={setQValue}
-              modules={{
-                toolbar: [
-                  [{ header: [1, 2, 3, false] }],
-                  ['bold', 'italic', 'blockquote', 'link'],
-                  [{ list: 'ordered' }, { list: 'bullet' }],
-                  ['clean']
-                ]
-              }}
-            />
+            />{' '}
           </Box>
           <Flex bg='#ccc' direction='column' flex={1} sx={{ overflow: 'auto' }}>
             <Flex
