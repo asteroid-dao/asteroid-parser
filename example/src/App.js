@@ -75,29 +75,6 @@ const App = () => {
     },
     keyboard: {
       bindings: {
-        handleDelete(range, context) {
-          // Check for astral symbols
-          const length = /^[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(context.suffix)
-            ? 2
-            : 1
-          if (range.index >= this.quill.getLength() - length) return
-          let formats = {}
-          const [line] = this.quill.getLine(range.index)
-          let delta = new Delta().retain(range.index).delete(length)
-          if (context.offset >= line.length() - 1) {
-            const [next] = this.quill.getLine(range.index + 1)
-            if (next) {
-              const curFormats = line.formats()
-              const nextFormats = this.quill.getFormat(range.index, 1)
-              formats = AttributeMap.diff(curFormats, nextFormats) || {}
-              if (Object.keys(formats).length > 0) {
-                delta = delta.retain(next.length() - 1).retain(1, formats)
-              }
-            }
-          }
-          this.quill.updateContents(delta, ReactQuill.Quill.sources.USER)
-          this.quill.focus()
-        },
         handleEnter: {
           key: 13,
           handler: function (range, context) {
@@ -301,7 +278,7 @@ const App = () => {
               modules={modules}
               onFocus={() => setIsMarkdown(false)}
               onBlur={() => setIsMarkdown(true)}
-            />{' '}
+            />
           </Box>
           <Flex bg='#ccc' direction='column' flex={1} sx={{ overflow: 'auto' }}>
             <Flex

@@ -46,7 +46,12 @@ export const ht2mt = unified().use(rehypeRemark).runSync
 
 export const ht2h = unified().use(rehypeStringify).stringify
 
-export const mt2m = unified().use(remarkStringify).stringify
+export const mt2m = compose(
+  join(`\n`),
+  map(v => (v === '\\' ? '<br />' : v.replace(/\\$/, '  '))),
+  split('\n'),
+  unified().use(remarkStringify).stringify
+)
 
 export const mt2s = mt => o(m2s, mt2m)(mt)
 
