@@ -10,6 +10,7 @@ import { visit } from 'unist-util-visit'
 import raw from 'rehype-raw'
 const entities = require('entities')
 import {
+  last,
   when,
   equals,
   ifElse,
@@ -46,12 +47,16 @@ export const ht2mt = unified().use(rehypeRemark).runSync
 
 export const ht2h = unified().use(rehypeStringify).stringify
 
-export const mt2m = compose(
-  join(`\n`),
-  map(v => (v === '\\' ? '<br />' : v.replace(/\\$/, '  '))),
-  split('\n'),
-  unified().use(remarkStringify).stringify
-)
+export const mt2m = mt => {
+  let isBlank = false
+  return compose(
+    join(`\n`),
+    when(o(isEmpty, last), init),
+    map(v => (v === '\\' ? '<br />' : v.replace(/\\$/, '  '))),
+    split('\n'),
+    unified().use(remarkStringify).stringify
+  )(mt)
+}
 
 export const mt2s = mt => o(m2s, mt2m)(mt)
 
@@ -88,11 +93,11 @@ export const m2s = m => {
           return false
         }
       } else {
-        if (v === '\\') isBlank = true
+        if (v === '\\' || isEmpty(v)) isBlank = true
       }
       return true
     }),
-    init,
+    when(o(isEmpty, last), init),
     split('\n')
   )(m)
 }
