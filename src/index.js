@@ -51,8 +51,19 @@ export const mt2m = mt => {
   let isBlank = false
   return compose(
     join(`\n`),
-    when(o(isEmpty, last), init),
     map(v => (v === '\\' ? '<br />' : v.replace(/\\$/, '  '))),
+    filter(v => {
+      if (isBlank) {
+        isBlank = false
+        if (isEmpty(v)) {
+          return false
+        }
+      } else {
+        if (v === '\\' || isEmpty(v)) isBlank = true
+      }
+      return true
+    }),
+    when(o(isEmpty, last), init),
     split('\n'),
     unified().use(remarkStringify).stringify
   )(mt)
@@ -79,28 +90,13 @@ export const ht2s = o(mt2s, ht2mt)
 
 export const m2h = o(ht2h, m2ht)
 
-export const m2s = m => {
-  let isBlank = false
-  return compose(
-    map(v => ({
-      type: 'paragraph',
-      children: [{ text: v === '\\' ? '<br />' : v.replace(/\\$/, '  ') }]
-    })),
-    filter(v => {
-      if (isBlank) {
-        isBlank = false
-        if (isEmpty(v)) {
-          return false
-        }
-      } else {
-        if (v === '\\' || isEmpty(v)) isBlank = true
-      }
-      return true
-    }),
-    when(o(isEmpty, last), init),
-    split('\n')
-  )(m)
-}
+export const m2s = o(
+  map(v => ({
+    type: 'paragraph',
+    children: [{ text: v }]
+  })),
+  split('\n')
+)
 
 export const h2m = o(mt2m, h2mt)
 
