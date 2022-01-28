@@ -5,8 +5,7 @@ import { createEditor } from 'slate'
 import { useFocused, Slate, Editable, withReact } from 'slate-react'
 import { ChakraProvider, Flex, Box } from '@chakra-ui/react'
 import { isNil } from 'ramda'
-import { s2m, s2h, q2s, s2q } from 'asteroid-editor'
-import 'asteroid-editor/dist/index.css'
+import { s2m, s2h, q2s, s2q } from 'asteroid-parser'
 const entities = require('entities')
 let Parchment = ReactQuill.Quill.import('parchment')
 let Delta = ReactQuill.Quill.import('delta')
@@ -32,7 +31,7 @@ SmartBreak.tagName = 'BR'
 
 function lineBreakMatcher() {
   let newDelta = new Delta()
-  newDelta.insert({ break: '' })
+  newDelta.insert({ ['inline-break']: '' })
   return newDelta
 }
 ReactQuill.Quill.register(SmartBreak)
@@ -68,6 +67,9 @@ const App = () => {
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],
+    clipboard: {
+      matchers: [['BR', lineBreakMatcher]]
+    },
     keyboard: {
       bindings: {
         handleEnter: {
