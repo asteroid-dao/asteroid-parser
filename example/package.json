@@ -15,6 +15,7 @@
     "@emotion/styled": "^11",
     "asteroid-editor": "link:..",
     "framer-motion": "4.1.17",
+    "parchment": "^2.0.0-dev.2",
     "quill-smart-break": "^0.2.0",
     "ramda": "^0.28.0",
     "react": "link:../node_modules/react",

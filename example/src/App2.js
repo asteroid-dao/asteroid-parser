@@ -7,6 +7,8 @@ import { ChakraProvider, Flex, Box } from '@chakra-ui/react'
 import { isNil } from 'ramda'
 import { s2m, s2h, q2s, s2q } from 'asteroid-editor'
 import 'asteroid-editor/dist/index.css'
+import AttributeMap from 'quill-delta/dist/AttributeMap'
+import { Scope, EmbedBlot } from 'parchment'
 const entities = require('entities')
 let Parchment = ReactQuill.Quill.import('parchment')
 let Delta = ReactQuill.Quill.import('delta')
@@ -27,7 +29,7 @@ class SmartBreak extends Break {
     Embed.prototype.insertInto.call(this, parent, ref)
   }
 }
-SmartBreak.blotName = 'inline-break'
+SmartBreak.blotName = 'break'
 SmartBreak.tagName = 'BR'
 
 function lineBreakMatcher() {
@@ -40,8 +42,17 @@ const App = () => {
   const [editor] = useState(() => withReact(createEditor()))
   const [qvalue, setQValue] = useState('')
   const [upV, setUpV] = useState(null)
+  const [initQuillRef, setInitQuillRef] = useState(false)
   const [isMarkdown, setIsMarkdown] = useState(true)
-  let quillRef = React.createRef()
+  const quillRef = React.createRef()
+  useEffect(() => {
+    if (!isNil(quillRef.current) && !initQuillRef) {
+      setInitQuillRef(true)
+      quillRef.current.on('selection-change', r => {
+        console.log(r.index)
+      })
+    }
+  }, [quillRef])
   const [value, setValue] = useState([
     {
       type: 'paragraph',
@@ -68,8 +79,63 @@ const App = () => {
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],
+    clipboard: {
+      matchers: [['BR', lineBreakMatcher]]
+    },
     keyboard: {
       bindings: {
+        handleLeft: {
+          key: 37,
+          handler: function (range) {
+            console.log('are we here?????')
+            let { index } = range
+            const [leaf] = this.quill.getLeaf(index)
+            if (!(leaf instanceof EmbedBlot)) return true
+            console.log('are we here2?????')
+            console.log(this.quill.getText())
+            this.quill.setSelection(
+              range.index - 1,
+              ReactQuill.Quill.sources.USER
+            )
+            return false
+          }
+        },
+        handleBackspace: {
+          key: 'Delete',
+          handler: function (range, context) {
+            // Check for astral symbols
+            const length = /^[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(
+              context.suffix
+            )
+              ? 2
+              : 1
+            const textLen = this.quill.getLength()
+            if (
+              range.index >= textLen - length ||
+              (range.index == textLen - 2 &&
+                this.quill.getText(textLen - 2, textLen) === '\n\n')
+            )
+              return
+            let formats = {}
+            const [line] = this.quill.getLine(range.index)
+            let delta = new Delta().retain(range.index).delete(length)
+            if (context.offset >= line.length() - 1) {
+              const [next] = this.quill.getLine(range.index + 1)
+              if (next) {
+                const curFormats = line.formats()
+                const nextFormats = this.quill.getFormat(range.index, 1)
+                formats = AttributeMap.diff(curFormats, nextFormats) || {}
+                if (Object.keys(formats).length > 0) {
+                  delta = delta.retain(next.length() - 1).retain(1, formats)
+                }
+              }
+            } else {
+            }
+            this.quill.updateContents(delta, ReactQuill.Quill.sources.USER)
+            this.quill.focus()
+          }
+        },
+
         handleEnter: {
           key: 13,
           handler: function (range, context) {
@@ -96,10 +162,17 @@ const App = () => {
               lineFormats,
               ReactQuill.Quill.sources.USER
             )
-            this.quill.setSelection(
-              range.index + 1,
-              ReactQuill.Quill.sources.SILENT
-            )
+            if (previousChar == '' || previousChar == '\n') {
+              this.quill.setSelection(
+                range.index + 2,
+                ReactQuill.Quill.sources.SILENT
+              )
+            } else {
+              this.quill.setSelection(
+                range.index + 1,
+                ReactQuill.Quill.sources.SILENT
+              )
+            }
             try {
               this.quill.selection.scrollIntoView()
             } catch (e) {}
@@ -120,16 +193,12 @@ const App = () => {
           shiftKey: true,
           handler: function (range, context) {
             var nextChar = this.quill.getText(range.index + 1, 1)
-            var ee = this.quill.insertEmbed(
-              range.index,
-              'inline-break',
-              true,
-              'user'
-            )
+            var ee = this.quill.insertEmbed(range.index, 'break', true, 'user')
             if (nextChar.length == 0) {
+              console.log('add another')
               var ee = this.quill.insertEmbed(
                 range.index,
-                'inline-break',
+                'break',
                 true,
                 'user'
               )
@@ -144,14 +213,53 @@ const App = () => {
     }
   }
   const modules = useMemo(() => options, [])
+  function makeEmbedArrowHandler(key, shiftKey) {
+    const where = key === 'ArrowLeft' ? 'prefix' : 'suffix'
+    return {
+      key,
+      shiftKey,
+      altKey: null,
+      [where]: /^$/,
+      handler(range) {
+        let { index } = range
+        if (key === 'ArrowRight') {
+          index += range.length + 1
+        }
+        const [leaf] = this.quill.getLeaf(index)
+        if (!(leaf instanceof EmbedBlot)) return true
+        if (key === 'ArrowLeft') {
+          if (shiftKey) {
+            this.quill.setSelection(
+              range.index - 1,
+              range.length + 1,
+              ReactQuill.Quill.sources.USER
+            )
+          } else {
+            this.quill.setSelection(
+              range.index - 1,
+              ReactQuill.Quill.sources.USER
+            )
+          }
+        } else if (shiftKey) {
+          this.quill.setSelection(
+            range.index,
+            range.length + 1,
+            ReactQuill.Quill.sources.USER
+          )
+        } else {
+          this.quill.setSelection(
+            range.index + range.length + 1,
+            ReactQuill.Quill.sources.USER
+          )
+        }
+        return false
+      }
+    }
+  }
   return (
     <ChakraProvider>
       <Flex height='100vh'>
         <style global jsx>{`
-          p,
-          .ql-editor p {
-            margin-bottom: 15px;
-          }
           .quill {
             display: flex;
             flex-direction: column;
@@ -259,11 +367,31 @@ const App = () => {
           <Box flex={1} bg='white' sx={{ overflow: 'auto' }}>
             <ReactQuill
               ref={el => {
-                if (!isNil(el) && isNil(quillRef)) quillRef = el.getEditor()
+                if (!isNil(el) && isNil(quillRef.current)) {
+                  quillRef.current = el.getEditor()
+                }
               }}
               theme='snow'
               value={qvalue}
               onChange={(val, d, s, e) => {
+                const length = e.getLength()
+                const all = e.getText()
+                const text = e.getText(length - 2, 2)
+                console.log(
+                  'chan[' + length + ']',
+                  e.getText().replace(/\n/g, '[b]'),
+                  e.getSelection().index
+                )
+                /*
+                if (text === '\n\n') {
+                  console.log('deleting...[\\n]')
+                  quillRef.current.deleteText(length - 1, 1)
+                  console.log(
+                    'change[' + length + ']',
+                    e.getText().replace(/\n/g, '[b]'),
+                    e.getSelection().index
+                  )
+                }*/
                 setQValue(val)
               }}
               modules={modules}
