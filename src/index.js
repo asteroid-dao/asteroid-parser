@@ -28,12 +28,23 @@ import {
   filter,
   pathEq,
   replace,
-  either
+  either,
+  isNil,
+  has
 } from 'ramda'
 
+let imageHook = null
+export const setImageHook = hook => {
+  imageHook = hook
+}
 export const m2mt = unified().use(remarkParse).parse
 
 export const mt2ht = mt => {
+  if (has('toBase64')(imageHook || [])) {
+    visit(mt, ['image'], node => {
+      node.url = imageHook.toBase64(node.url)
+    })
+  }
   visit(mt, ['text'], node => (node.value = node.value.replace(/\n$/, '')))
   return unified()
     .use(remarkRehype, { allowDangerousHtml: true })
@@ -43,7 +54,16 @@ export const mt2ht = mt => {
 
 export const h2ht = unified().use(rehypeParse).parse
 
-export const ht2mt = unified().use(rehypeRemark).runSync
+export const ht2mt = ht => {
+  const mt = unified().use(rehypeRemark).runSync(ht)
+  if (has('fromBase64')(imageHook || {})) {
+    visit(mt, ['image'], node => {
+      node.url = imageHook.fromBase64(node.url)
+    })
+  }
+
+  return mt
+}
 
 export const ht2h = unified().use(rehypeStringify).stringify
 
@@ -148,3 +168,137 @@ export const q2m = o(h2m, q2h)
 export const ht2q = o(h2q, ht2h)
 
 export const q2ht = o(h2ht, q2h)
+/*
+export class Parser {
+  constructor({ imageHook }) {
+    this.imageHook = imageHook
+  }
+  m2mt(m) {
+    return m2mt(m)
+  }
+  mt2ht(mt) {
+    if (!isNil(this.imageHook)) {
+      visit(mt, ['image'], node => {
+        node.url = this.imageHook.toBase64(node.url)
+      })
+    }
+    return mt2ht(mt)
+  }
+  ht2mt(ht) {
+  const mt = unified().use(rehypeRemark).runSync(ht)
+    if (!isNil(this.imageHook)) {
+      visit(mt, ['image'], node => {
+        node.url = this.imageHook.fromBase64(node.url)
+      })
+    }
+    return mt
+  }
+  h2ht(h) {
+    console.log(h2ht(h))
+    return h2ht(h)
+  }
+
+  ht2h(ht) {
+    return ht2h(ht)
+  }
+
+  mt2m(mt) {
+    return mt2m(mt)
+  }
+  mt2h(mt) {
+    const ht = this.mt2ht(mt)
+    visit(ht, ['element'], (node, i, p) => {
+      if (p.type === 'root' && node.tagName === 'br') {
+        node.tagName = 'p'
+        node.children.push({ type: 'element', tagName: 'br', children: [] })
+      }
+    })
+    return this.ht2h(ht)
+  }
+
+  ht2s(ht) {
+    return o(this.mt2s, this.ht2mt)(ht)
+  }
+
+  m2h(m) {
+    return o(this.ht2h, this.m2ht)(m)
+  }
+
+  m2s(m) {
+    return m2s(m)
+  }
+
+  h2m(h) {
+    return o(this.mt2m, this.h2mt)(h)
+  }
+
+  h2s(h) {
+    return ifElse(
+      isEmpty,
+      always([
+        {
+          type: 'paragraph',
+          children: [{ text: '' }]
+        }
+      ]),
+      o(this.ht2s, this.h2ht)
+    )(h)
+  }
+
+  s2m(s) {
+    return s2m(s)
+  }
+
+  s2mt(s) {
+    return o(this.m2mt, this.s2m)(s)
+  }
+
+  s2h(s) {
+    return o(this.mt2h, this.s2mt)(s)
+  }
+
+  s2ht(s) {
+    return o(this.m2ht, this.s2m)(s)
+  }
+
+  h2q(h) {
+    return h2q(h)
+  }
+
+  s2q(s) {
+    return o(this.h2q, this.s2h)(s)
+  }
+
+  q2h(q) {
+    return q2h(q)
+  }
+
+  q2s(q) {
+    return o(this.h2s, this.q2h)(q)
+  }
+
+  mt2q(mt) {
+    return o(this.h2q, this.mt2ht)(mt)
+  }
+
+  q2mt(q) {
+    return o(this.h2mt, this.q2h)(q)
+  }
+
+  m2q(m) {
+    return o(this.h2q, this.m2h)(m)
+  }
+
+  q2m(q) {
+    return o(this.h2m, this.q2h)(q)
+  }
+
+  ht2q(ht) {
+    return o(this.h2q, this.ht2h)(ht)
+  }
+
+  q2ht(q) {
+    return o(this.h2ht, this.q2h)(q)
+  }
+}
+*/

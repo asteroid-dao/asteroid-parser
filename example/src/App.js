@@ -5,7 +5,9 @@ import { createEditor } from 'slate'
 import { useFocused, Slate, Editable, withReact } from 'slate-react'
 import { ChakraProvider, Flex, Box } from '@chakra-ui/react'
 import { isNil } from 'ramda'
-import { s2m, s2h, q2s, s2q } from 'asteroid-parser'
+import { setImageHook, s2m, s2h, q2s, s2q } from 'asteroid-parser'
+import ImageUploader from 'quill-image-uploader2'
+import { sha256 } from 'js-sha256'
 const entities = require('entities')
 let Parchment = ReactQuill.Quill.import('parchment')
 let Delta = ReactQuill.Quill.import('delta')
@@ -35,6 +37,7 @@ function lineBreakMatcher() {
   return newDelta
 }
 ReactQuill.Quill.register(SmartBreak)
+ImageUploader(ReactQuill.Quill)
 const App = () => {
   const [editor] = useState(() => withReact(createEditor()))
   const [qvalue, setQValue] = useState('')
@@ -47,6 +50,24 @@ const App = () => {
       children: [{ text: '' }]
     }
   ])
+  useEffect(() => {
+    setImageHook({
+      fromBase64: url => {
+        if (/^data\:image\/.+/.test(url)) {
+          const img = window.image_map[sha256(url)]
+          if (!isNil(img)) return `data:image/${img.ext};local,${img.id}`
+        }
+        return url
+      },
+      toBase64: url => {
+        if (/^data\:image\/.+;local,/.test(url)) {
+          const img = window.image_map[url.split(',')[1]]
+          if (!isNil(img)) return img.url
+        }
+        return url
+      }
+    })
+  }, [])
   useEffect(() => {
     if (isMarkdown) {
       setQValue(s2q(value))
@@ -63,10 +84,11 @@ const App = () => {
   const options = {
     toolbar: [
       [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'blockquote', 'link'],
+      ['bold', 'italic', 'blockquote', 'link', 'image'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],
+    imageUploader: {},
     clipboard: {
       matchers: [['BR', lineBreakMatcher]]
     },
