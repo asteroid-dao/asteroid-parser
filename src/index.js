@@ -40,7 +40,6 @@ export const setImageHook = hook => {
 export const m2mt = unified().use(remarkParse).parse
 
 export const mt2ht = mt => {
-  console.log(mt)
   if (has('toBase64')(imageHook || [])) {
     visit(mt, ['image'], node => {
       node.url = imageHook.toBase64(node.url)
