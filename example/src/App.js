@@ -84,7 +84,7 @@ const App = () => {
   const options = {
     toolbar: [
       [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'blockquote', 'link', 'image'],
+      ['bold', 'italic', 'underline', 'blockquote', 'link', 'image'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],

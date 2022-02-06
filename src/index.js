@@ -1,4 +1,5 @@
 import { unified } from 'unified'
+import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import rehypeStringify from 'rehype-stringify'
@@ -9,6 +10,10 @@ import slate, { serialize } from 'remark-slate'
 import { visit } from 'unist-util-visit'
 import raw from 'rehype-raw'
 const entities = require('entities')
+import { toHtml } from 'hast-util-to-html'
+import { toMarkdown } from 'mdast-util-to-markdown'
+import { all } from 'mdast-util-to-hast'
+import { safe } from 'mdast-util-to-markdown/lib/util/safe'
 import {
   last,
   when,
@@ -30,14 +35,59 @@ import {
   replace,
   either,
   isNil,
-  has
+  has,
+  addIndex,
+  concat,
+  prop,
+  sortBy
 } from 'ramda'
 
 let imageHook = null
 export const setImageHook = hook => {
   imageHook = hook
 }
-export const m2mt = unified().use(remarkParse).parse
+export const m2mt = m => {
+  let mt = unified()
+    .use(remarkParse, {
+      handlers: {
+        text: (node, _, context, safeOptions) => {
+          return /^\+.+\+$/.test(node.value)
+            ? node.value
+            : safe(context, node.value, safeOptions)
+        }
+      }
+    })
+    .use(remarkGfm)
+    .parse(m)
+  visit(mt, ['text'], (node, i, p) => {
+    if (/\+.+\+/.test(node.value)) {
+      const texts = addIndex(map)(
+        (v, i) => ({ index: i * 2, val: { value: v, type: 'text' } }),
+        node.value.split(/\+.+?\+/)
+      )
+      const us = addIndex(map)(
+        (v, i) => ({
+          index: i * 2 + 1,
+          val: {
+            type: 'u',
+            children: [{ type: 'text', value: v.replace(/^\+(.+)\+$/, '$1') }]
+          }
+        }),
+        node.value.match(/\+.+?\+/g)
+      )
+      p.children.splice(
+        i,
+        1,
+        ...compose(
+          map(prop('val')),
+          reject(pathEq(['val', 'value'], '')),
+          sortBy(prop('index'))
+        )(concat(us, texts))
+      )
+    }
+  })
+  return mt
+}
 
 export const mt2ht = mt => {
   if (has('toBase64')(imageHook || [])) {
@@ -50,26 +100,43 @@ export const mt2ht = mt => {
     if (parent.type === 'root') node.value = '<p><br /></p>'
     return node
   })
-  return unified()
-    .use(remarkRehype, { allowDangerousHtml: true })
+  let ht = unified()
+    .use(remarkRehype, {
+      allowDangerousHtml: true,
+      handlers: {
+        u: (h, node) => h(node, 'u', all(h, node))
+      }
+    })
     .use(raw)
     .runSync(mt)
+  return ht
 }
 
 export const h2ht = unified().use(rehypeParse).parse
 
 export const ht2mt = ht => {
-  const mt = unified().use(rehypeRemark).runSync(ht)
+  const mt = unified()
+    .use(rehypeRemark, {
+      handlers: {
+        u(h, node) {
+          node.children[0].value = `+${node.children[0].value}+`
+          return h(node, 'paragraph', node.children)
+        }
+      }
+    })
+    .runSync(ht)
   if (has('fromBase64')(imageHook || {})) {
     visit(mt, ['image'], node => {
       node.url = imageHook.fromBase64(node.url)
     })
   }
-
   return mt
 }
 
-export const ht2h = unified().use(rehypeStringify).stringify
+export const ht2h = ht => {
+  let h = unified().use(rehypeStringify).stringify(ht)
+  return h
+}
 
 export const mt2m = mt => {
   let isBlank = false
@@ -88,9 +155,19 @@ export const mt2m = mt => {
       return true
     }),
     when(o(isEmpty, last), init),
-    split('\n'),
-    unified().use(remarkStringify).stringify
-  )(mt)
+    split('\n')
+  )(
+    unified()
+      .use(remarkStringify, {
+        handlers: {
+          text: (node, _, context, safeOptions) =>
+            /^\+.+\+$/.test(node.value)
+              ? node.value
+              : safe(context, node.value, safeOptions)
+        }
+      })
+      .stringify(mt)
+  )
 }
 
 export const mt2s = mt => o(m2s, mt2m)(mt)
