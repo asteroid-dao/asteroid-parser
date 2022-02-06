@@ -141,7 +141,7 @@ export const ht2mt = ht => {
         },
         span(h, node) {
           return !hasPath(['properties', 'style'])(node)
-            ? h(node, 'span', all2(h, node))
+            ? h(node, 'paragraph', all2(h, node))
             : h(node, 'html', toHtml(node))
         },
         u(h, node) {
