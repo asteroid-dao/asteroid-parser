@@ -14,7 +14,9 @@ import { toHtml } from 'hast-util-to-html'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { all } from 'mdast-util-to-hast'
 import { safe } from 'mdast-util-to-markdown/lib/util/safe'
+import { containerFlow } from 'mdast-util-to-markdown/lib/util/container-flow'
 import {
+  tap,
   last,
   when,
   equals,
@@ -112,7 +114,9 @@ export const mt2ht = mt => {
   return ht
 }
 
-export const h2ht = unified().use(rehypeParse).parse
+export const h2ht = h => {
+  return unified().use(rehypeParse).parse(h)
+}
 
 export const ht2mt = ht => {
   const mt = unified()
@@ -155,15 +159,21 @@ export const mt2m = mt => {
       return true
     }),
     when(o(isEmpty, last), init),
-    split('\n')
+    split('\n'),
+    tap(v => {
+      console.log('tap', v)
+    })
   )(
     unified()
       .use(remarkStringify, {
         handlers: {
-          text: (node, _, context, safeOptions) =>
-            /^\+.+\+$/.test(node.value)
+          delete: (node, _, context, safeOptions) =>
+            `~${containerFlow(node, context, safeOptions)}~`,
+          text: (node, _, context, safeOptions) => {
+            return /^\+.+\+$/.test(node.value)
               ? node.value
               : safe(context, node.value, safeOptions)
+          }
         }
       })
       .stringify(mt)

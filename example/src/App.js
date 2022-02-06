@@ -31,6 +31,10 @@ class SmartBreak extends Break {
 SmartBreak.blotName = 'inline-break'
 SmartBreak.tagName = 'BR'
 
+const Strike = ReactQuill.Quill.import('formats/strike')
+Strike.tagName = 'DEL'
+ReactQuill.Quill.register(Strike, true)
+
 function lineBreakMatcher() {
   let newDelta = new Delta()
   newDelta.insert({ ['inline-break']: '' })
@@ -84,7 +88,7 @@ const App = () => {
   const options = {
     toolbar: [
       [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'blockquote', 'link', 'image'],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote', 'link', 'image'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],
