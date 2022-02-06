@@ -89,6 +89,7 @@ const App = () => {
     toolbar: [
       [{ header: [1, 2, 3, false] }],
       ['bold', 'italic', 'underline', 'strike', 'blockquote', 'link', 'image'],
+      [{ color: [] }, { background: [] }],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['clean']
     ],

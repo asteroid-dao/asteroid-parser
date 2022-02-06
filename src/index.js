@@ -122,9 +122,31 @@ export const ht2mt = ht => {
   const mt = unified()
     .use(rehypeRemark, {
       handlers: {
+        em(h, node) {
+          return isEmpty(isNil(node.properties))
+            ? h(node, 'paragraph', node.children)
+            : h(node, 'html', toHtml(node))
+        },
+        strong(h, node) {
+          return isEmpty(isNil(node.properties))
+            ? h(node, 'paragraph', node.children)
+            : h(node, 'html', toHtml(node))
+        },
+        del(h, node) {
+          return isEmpty(isNil(node.properties))
+            ? h(node, 'paragraph', node.children)
+            : h(node, 'html', toHtml(node))
+        },
+        span(h, node) {
+          return isEmpty(isNil(node.properties))
+            ? h(node, 'paragraph', node.children)
+            : h(node, 'html', toHtml(node))
+        },
         u(h, node) {
           node.children[0].value = `+${node.children[0].value}+`
-          return h(node, 'paragraph', node.children)
+          return isEmpty(isNil(node.properties))
+            ? h(node, 'paragraph', node.children)
+            : h(node, 'html', toHtml(node))
         }
       }
     })
@@ -159,10 +181,7 @@ export const mt2m = mt => {
       return true
     }),
     when(o(isEmpty, last), init),
-    split('\n'),
-    tap(v => {
-      console.log('tap', v)
-    })
+    split('\n')
   )(
     unified()
       .use(remarkStringify, {
