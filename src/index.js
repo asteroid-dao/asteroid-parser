@@ -1,4 +1,5 @@
 import { unified } from 'unified'
+import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
@@ -9,6 +10,7 @@ import rehypeParse from 'rehype-parse'
 import slate, { serialize } from 'remark-slate'
 import { visit } from 'unist-util-visit'
 import raw from 'rehype-raw'
+import rehypeKatex from 'rehype-katex'
 const entities = require('entities')
 import { toHtml } from 'hast-util-to-html'
 import { toMarkdown } from 'mdast-util-to-markdown'
@@ -67,6 +69,7 @@ export const m2mt = m => {
       }
     })
     .use(remarkGfm)
+    .use(remarkMath)
     .parse(m)
   visit(mt, ['text'], (node, i, p) => {
     if (/\+.+\+/.test(node.value)) {
@@ -117,6 +120,7 @@ export const mt2ht = mt => {
       }
     })
     .use(raw)
+    .use(rehypeKatex)
     .runSync(mt)
   return ht
 }
