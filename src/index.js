@@ -13,10 +13,17 @@ const entities = require('entities')
 import { toHtml } from 'hast-util-to-html'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { all } from 'mdast-util-to-hast'
+import { all as all2 } from 'hast-util-to-mdast'
 import { safe } from 'mdast-util-to-markdown/lib/util/safe'
 import { containerFlow } from 'mdast-util-to-markdown/lib/util/container-flow'
+import { wrap } from './wrap'
+import { convertElement } from 'hast-util-is-element'
+
+const p = convertElement('p')
+const input = convertElement('input')
+
 import {
-  tap,
+  hasPath,
   last,
   when,
   equals,
@@ -122,31 +129,73 @@ export const ht2mt = ht => {
   const mt = unified()
     .use(rehypeRemark, {
       handlers: {
-        em(h, node) {
-          return isEmpty(isNil(node.properties))
-            ? h(node, 'paragraph', node.children)
-            : h(node, 'html', toHtml(node))
-        },
         strong(h, node) {
-          return isEmpty(isNil(node.properties))
-            ? h(node, 'paragraph', node.children)
+          return !hasPath(['properties', 'style'])(node)
+            ? h(node, 'strong', all2(h, node))
             : h(node, 'html', toHtml(node))
         },
         del(h, node) {
-          return isEmpty(isNil(node.properties))
-            ? h(node, 'paragraph', node.children)
+          return !hasPath(['properties', 'style'])(node)
+            ? h(node, 'delete', all2(h, node))
             : h(node, 'html', toHtml(node))
         },
         span(h, node) {
-          return isEmpty(isNil(node.properties))
-            ? h(node, 'paragraph', node.children)
+          return !hasPath(['properties', 'style'])(node)
+            ? h(node, 'span', all2(h, node))
             : h(node, 'html', toHtml(node))
         },
         u(h, node) {
           node.children[0].value = `+${node.children[0].value}+`
-          return isEmpty(isNil(node.properties))
-            ? h(node, 'paragraph', node.children)
+          return !hasPath(['properties', 'style'])(node)
+            ? h(node, 'paragraph', all2(h, node))
             : h(node, 'html', toHtml(node))
+        },
+        em(h, node) {
+          return !hasPath(['properties', 'style'])(node)
+            ? h(node, 'emphasis', all2(h, node))
+            : h(node, 'html', toHtml(node))
+        },
+        li(h, node) {
+          const head = node.children[0]
+          /** @type {boolean|null} */
+          let checked = null
+          /** @type {ElementChild} */
+          let checkbox
+          /** @type {Element|undefined} */
+          let clone
+
+          // Check if this node starts with a checkbox.
+          if (p(head)) {
+            checkbox = head.children[0]
+
+            if (
+              input(checkbox) &&
+              checkbox.properties &&
+              (checkbox.properties.type === 'checkbox' ||
+                checkbox.properties.type === 'radio')
+            ) {
+              checked = Boolean(checkbox.properties.checked)
+              clone = {
+                ...node,
+                children: [
+                  { ...head, children: head.children.slice(1) },
+                  ...node.children.slice(1)
+                ]
+              }
+            }
+          }
+
+          const content = wrap(all2(h, clone || node))
+
+          return h(
+            node,
+            'listItem',
+            { spread: content.length > 1, checked },
+            content
+          )
+        },
+        blockquote(h, node) {
+          return h(node, 'blockquote', wrap(all2(h, node)))
         }
       }
     })
