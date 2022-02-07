@@ -20,6 +20,7 @@ import { safe } from 'mdast-util-to-markdown/lib/util/safe'
 import { containerFlow } from 'mdast-util-to-markdown/lib/util/container-flow'
 import { wrap } from './wrap'
 import { convertElement } from 'hast-util-is-element'
+import rehypeHighlight from 'rehype-highlight'
 
 const p = convertElement('p')
 const input = convertElement('input')
@@ -126,7 +127,7 @@ export const mt2ht = mt => {
 }
 
 export const h2ht = h => {
-  return unified().use(rehypeParse).parse(h)
+  return unified().use(rehypeParse, { fregment: true }).parse(h)
 }
 
 export const ht2mt = ht => {
@@ -213,8 +214,18 @@ export const ht2mt = ht => {
 }
 
 export const ht2h = ht => {
-  let h = unified().use(rehypeStringify).stringify(ht)
-  return h
+  visit(ht, ['element'], node => {
+    if (
+      node.tagName === 'pre' &&
+      !isNil(node.children[0]) &&
+      node.children[0].tagName === 'code'
+    ) {
+      try {
+        node = unified().use(rehypeHighlight).runSync(node)
+      } catch (e) {}
+    }
+  })
+  return unified().use(rehypeStringify).stringify(ht)
 }
 
 export const mt2m = mt => {

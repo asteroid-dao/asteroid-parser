@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, createRef } from 'react'
 import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
+import Dracula from './Dracula'
 import { createEditor } from 'slate'
 import { useFocused, Slate, Editable, withReact } from 'slate-react'
 import { ChakraProvider, Flex, Box } from '@chakra-ui/react'
@@ -202,6 +203,7 @@ const App = () => {
             margin-left: 120px;
           }
         `}</style>
+        <Dracula />
         <Flex bg='#eee' flex={1} direction='column' height='100%'>
           <Flex
             direction='column'
